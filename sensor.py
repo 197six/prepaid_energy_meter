@@ -43,7 +43,9 @@ class PrepaidEnergySensor(SensorEntity):
         new_state = event.data.get("new_state")
         if new_state and new_state.state not in ("unavailable", "unknown", None, ""):
             current_reading = float(new_state.state)
-            used = current_reading - self._start_reading
+            if self._start_reading is None:
+                self._start_reading = current_reading
+            used = max(0.0, current_reading - self._start_reading)
             self._attr_state = round(max(0.0, self._starting_units - used), 2)
             self.async_write_ha_state()
 
