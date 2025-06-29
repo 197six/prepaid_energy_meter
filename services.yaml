@@ -1,0 +1,31 @@
+update_units:
+  name: Update Units
+  description: Add more kWh to the prepaid meter.
+  fields:
+    additional_units:
+      name: Additional Units
+      description: How many kWh were purchased and should be added.
+      required: true
+      example: 25.5
+      selector:
+        number:
+          min: 0
+          max: 9999
+          step: 0.01
+          unit_of_measurement: kWh
+
+reset_units:
+  name: Reset Units
+  description: Reset prepaid units to a specified starting value.
+  fields:
+    starting_units:
+      name: Starting Units
+      description: Set the prepaid meter to a specific value.
+      required: true
+      example: 150.0
+      selector:
+        number:
+          min: 0
+          max: 9999
+          step: 0.01
+          unit_of_measurement: kWh
