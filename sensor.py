@@ -9,7 +9,6 @@ from .const import DOMAIN, CONF_METER_SENSOR, CONF_INITIAL_BALANCE
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up Prepaid Energy Meter sensor from a config entry."""
     async_add_entities([PrepaidEnergySensor(hass, config_entry)])
-    await hass.async_forward_entry_setup(config_entry, "sensor")
 
 class PrepaidEnergySensor(RestoreEntity, SensorEntity):
     """Sensor to track prepaid energy balance."""
