@@ -1,11 +1,16 @@
+"""Sensor platform for Prepaid Energy Meter."""
+
 from datetime import timedelta, datetime
 from homeassistant.components.sensor import SensorEntity
 from homeassistant.helpers.event import async_track_time_change
+from homeassistant.helpers.entity import Entity
 
 from .const import DOMAIN
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
-    async_add_entities([PrepaidEnergySensor(hass, config_entry)])
+    """Set up Prepaid Energy Meter sensor(s) from a config entry."""
+    # Placeholder: Add your sensor entity/entities here
+    async_add_entities([])
 
 class PrepaidEnergySensor(SensorEntity):
     def __init__(self, hass, config_entry):

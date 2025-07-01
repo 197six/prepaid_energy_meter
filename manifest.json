@@ -2,9 +2,9 @@
   "domain": "prepaid_energy_meter",
   "name": "Prepaid Energy Meter",
   "version": "0.1.0",
-  "documentation": "https://github.com/197six/prepaid_energy_meter",
+  "documentation": "https://github.com/yourusername/prepaid_energy_meter",
   "requirements": [],
   "dependencies": [],
-  "codeowners": ["@197six"],
+  "codeowners": ["@yourusername"],
   "config_flow": true
 }

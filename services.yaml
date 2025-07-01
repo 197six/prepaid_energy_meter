@@ -1,3 +1,5 @@
+# Document your custom services here.
+
 update_units:
   name: Update Units
   description: Add more kWh to the prepaid meter.
