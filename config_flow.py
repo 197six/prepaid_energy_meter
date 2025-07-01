@@ -12,7 +12,7 @@ class PrepaidEnergyConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="user",
             data_schema=vol.Schema({
-                vol.Required("starting_units", default=0.0): float,
+                vol.Required("starting_units", default=0.0): vol.Coerce(float),
                 vol.Required("energy_sensor"): str,
             }),
             errors=errors,
