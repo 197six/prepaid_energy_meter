@@ -31,3 +31,35 @@ reset_units:
           max: 9999
           step: 0.01
           unit_of_measurement: kWh
+
+top_up:
+  name: Top Up
+  description: Add units to the prepaid balance.
+  fields:
+    units:
+      name: Units
+      description: How many kWh to add.
+      required: true
+      example: 25.5
+      selector:
+        number:
+          min: 0
+          max: 9999
+          step: 0.01
+          unit_of_measurement: kWh
+
+reset:
+  name: Reset
+  description: Reset prepaid balance to a specific value.
+  fields:
+    value:
+      name: Value
+      description: Set the prepaid meter to a specific value.
+      required: true
+      example: 150.0
+      selector:
+        number:
+          min: 0
+          max: 9999
+          step: 0.01
+          unit_of_measurement: kWh
