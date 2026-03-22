@@ -1,0 +1,35 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Prepaid Energy Meter Setup",
+        "description": "Configure your prepaid electricity meter tracker. You will need the entity ID of a sensor that tracks your total grid kWh consumption.",
+        "data": {
+          "meter_sensor": "Grid kWh Meter Sensor",
+          "initial_balance": "Current Balance (kWh)",
+          "threshold_warning": "Warning Threshold (kWh)",
+          "threshold_low": "Low Threshold (kWh)",
+          "threshold_critical": "Critical Threshold (kWh)",
+          "notification_service": "Notification Service (e.g. notify.mobile_app_your_phone)"
+        }
+      }
+    },
+    "error": {
+      "sensor_not_found": "Sensor not found. Please check the entity ID.",
+      "sensor_not_numeric": "Sensor does not return a numeric value. Please choose a kWh energy sensor."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Update Alert Thresholds",
+        "data": {
+          "threshold_warning": "Warning Threshold (kWh)",
+          "threshold_low": "Low Threshold (kWh)",
+          "threshold_critical": "Critical Threshold (kWh)",
+          "notification_service": "Notification Service"
+        }
+      }
+    }
+  }
+}

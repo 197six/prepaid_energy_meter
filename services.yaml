@@ -1,0 +1,31 @@
+top_up:
+  name: Top Up Balance
+  description: Add prepaid units to the energy meter balance.
+  fields:
+    units:
+      name: Units
+      description: Number of kWh units to add to the balance.
+      required: true
+      example: 50.0
+      selector:
+        number:
+          min: 0.1
+          max: 10000
+          step: 0.1
+          unit_of_measurement: kWh
+
+reset:
+  name: Reset Balance
+  description: Set the prepaid balance to a specific value. Use when reconciling against your actual meter statement.
+  fields:
+    balance:
+      name: Balance
+      description: The new balance in kWh to set.
+      required: true
+      example: 100.0
+      selector:
+        number:
+          min: 0
+          max: 10000
+          step: 0.1
+          unit_of_measurement: kWh

@@ -1,0 +1,12 @@
+{
+  "domain": "prepaid_energy_meter",
+  "name": "Prepaid Energy Meter",
+  "version": "2.0.0",
+  "documentation": "https://github.com/197six/prepaid_energy_meter",
+  "issue_tracker": "https://github.com/197six/prepaid_energy_meter/issues",
+  "codeowners": ["@197six"],
+  "requirements": [],
+  "dependencies": [],
+  "iot_class": "local_push",
+  "config_flow": true
+}
