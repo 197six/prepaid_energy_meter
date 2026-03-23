@@ -19,6 +19,8 @@ SERVICE_RESET_SCHEMA = vol.Schema({
     vol.Required("balance"): vol.Coerce(float),
 })
 
+SERVICE_FORCE_UPDATE_SCHEMA = vol.Schema({})
+
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Prepaid Energy Meter from a config entry."""
@@ -44,11 +46,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             if sensor:
                 await sensor.async_reset(balance)
 
+    async def handle_force_update(call: ServiceCall) -> None:
+        """Trigger an immediate daily update calculation outside of the scheduled 23:59:55 run."""
+        for entry_id, entry_data in hass.data[DOMAIN].items():
+            sensor = entry_data.get("sensor")
+            if sensor:
+                await sensor.async_force_update()
+
     hass.services.async_register(
         DOMAIN, "top_up", handle_top_up, schema=SERVICE_TOP_UP_SCHEMA
     )
     hass.services.async_register(
         DOMAIN, "reset", handle_reset, schema=SERVICE_RESET_SCHEMA
+    )
+    hass.services.async_register(
+        DOMAIN, "force_update", handle_force_update, schema=SERVICE_FORCE_UPDATE_SCHEMA
     )
 
     return True
@@ -64,5 +76,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     if not hass.data[DOMAIN]:
         hass.services.async_remove(DOMAIN, "top_up")
         hass.services.async_remove(DOMAIN, "reset")
+        hass.services.async_remove(DOMAIN, "force_update")
 
     return unload_ok

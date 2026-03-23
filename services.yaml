@@ -29,3 +29,12 @@ reset:
           max: 10000
           step: 0.1
           unit_of_measurement: kWh
+
+force_update:
+  name: Force Update
+  description: >
+    Trigger an immediate daily consumption calculation without waiting for the
+    scheduled 23:59:55 run. Use this on first deployment to account for today's
+    usage, or any time you want an out-of-schedule reconciliation against your
+    actual meter reading.
+

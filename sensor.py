@@ -236,6 +236,15 @@ class PrepaidEnergySensor(RestoreEntity, SensorEntity):
         self.async_write_ha_state()
         _LOGGER.info("Balance reset to %.2f kWh.", self._balance)
 
+    async def async_force_update(self):
+        """
+        Manually trigger a daily update calculation immediately.
+        Useful on first deployment to account for today's usage,
+        or any time you want an out-of-schedule reconciliation.
+        """
+        _LOGGER.info("Force update triggered manually.")
+        await self._daily_update(None)
+
     # --- Alerts ---
 
     async def _check_alerts(self):
