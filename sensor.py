@@ -185,13 +185,14 @@ class PrepaidEnergySensor(RestoreEntity, SensorEntity):
             _LOGGER.info("First daily run -- seeded meter baseline at %.2f kWh.", current_meter)
             return
 
-        # Handle meter rollover or reset (e.g. meter replaced, counter reset)
+        # If current reading is less than last, the sensor has reset (daily counter).
+        # Treat the current reading as today's usage directly.
         if current_meter < self._last_meter_value:
-            _LOGGER.warning(
-                "Meter reading dropped from %.2f to %.2f. Possible rollover or reset. Treating usage as 0 today.",
+            _LOGGER.info(
+                "Meter reset detected (%.2f -> %.2f). Treating current reading as today's usage.",
                 self._last_meter_value, current_meter
             )
-            used = 0.0
+            used = round(current_meter, 2)
         else:
             used = round(current_meter - self._last_meter_value, 2)
 
