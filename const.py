@@ -16,15 +16,8 @@ DEFAULT_THRESHOLD_LOW = 25.0
 DEFAULT_THRESHOLD_CRITICAL = 10.0
 DEFAULT_NOTIFICATION_SERVICE = "notify.mobile_app"
 
-# Storage keys
-STORAGE_KEY = "prepaid_energy_meter_data"
-STORAGE_VERSION = 1
-
 # Alert levels
 ALERT_WARNING = "warning"
 ALERT_LOW = "low"
 ALERT_CRITICAL = "critical"
 ALERT_NONE = "none"
-
-# How many days of history to use for average consumption estimate
-ROLLING_AVERAGE_DAYS = 7

@@ -1,7 +1,6 @@
 """Sensor platform for Prepaid Energy Meter."""
 import logging
-from collections import deque
-from datetime import datetime, date
+from datetime import datetime
 
 from homeassistant.components.sensor import SensorEntity, SensorDeviceClass
 from homeassistant.helpers.event import async_track_time_change
@@ -23,7 +22,6 @@ from .const import (
     ALERT_LOW,
     ALERT_CRITICAL,
     ALERT_NONE,
-    ROLLING_AVERAGE_DAYS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -33,8 +31,6 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up Prepaid Energy Meter sensor from a config entry."""
     sensor = PrepaidEnergySensor(hass, config_entry)
     async_add_entities([sensor])
-
-    # Register sensor reference so __init__ services can reach it
     hass.data[DOMAIN][config_entry.entry_id]["sensor"] = sensor
 
 
@@ -42,8 +38,8 @@ class PrepaidEnergySensor(RestoreEntity, SensorEntity):
     """
     Tracks a prepaid electricity balance.
 
-    Balance decrements nightly based on the delta of a grid kWh meter sensor.
-    Supports manual top-up via service call.
+    Reads a grid kWh meter sensor at 23:59:55 each night.
+    Subtracts the day's usage from the running balance.
     Fires HA notifications when balance crosses configurable thresholds.
     """
 
@@ -67,13 +63,10 @@ class PrepaidEnergySensor(RestoreEntity, SensorEntity):
         self._notification_service = cfg.get(CONF_NOTIFICATION_SERVICE, DEFAULT_NOTIFICATION_SERVICE)
 
         self._last_meter_value = None
-        self._last_update = None
+        self._last_updated = None
         self._last_topup_amount = None
         self._last_topup_date = None
         self._last_alert_level = ALERT_NONE
-
-        # Rolling daily consumption log: list of (date_str, kWh_used) tuples
-        self._daily_log: deque = deque(maxlen=ROLLING_AVERAGE_DAYS)
 
     # --- Properties ---
 
@@ -83,26 +76,18 @@ class PrepaidEnergySensor(RestoreEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self):
-        avg = self._rolling_average()
-        days_remaining = None
-        if avg and avg > 0:
-            days_remaining = round(self._balance / avg, 1)
-
         return {
-            "last_updated": self._last_update.strftime("%Y-%m-%d %H:%M:%S") if self._last_update else None,
+            "last_updated": self._last_updated.strftime("%Y-%m-%d %H:%M:%S") if self._last_updated else None,
             "last_meter_reading": self._last_meter_value,
             "last_topup_amount_kwh": self._last_topup_amount,
             "last_topup_date": self._last_topup_date,
-            "daily_average_kwh": round(avg, 2) if avg else None,
-            "estimated_days_remaining": days_remaining,
             "alert_level": self._last_alert_level,
-            "daily_consumption_log": list(self._daily_log),
         }
 
     # --- Lifecycle ---
 
     async def async_added_to_hass(self):
-        """Restore previous state and start daily update timer."""
+        """Restore previous state and start nightly update timer."""
         await super().async_added_to_hass()
         await self._restore_state()
 
@@ -116,7 +101,7 @@ class PrepaidEnergySensor(RestoreEntity, SensorEntity):
         _LOGGER.info("Prepaid Energy Meter initialised. Balance: %.2f kWh", self._balance)
 
     async def _restore_state(self):
-        """Restore balance and history from last known state."""
+        """Restore balance and meter reading from last known state."""
         last_state = await self.async_get_last_state()
         if not last_state or last_state.state in ("unknown", "unavailable"):
             _LOGGER.debug("No previous state to restore.")
@@ -126,7 +111,7 @@ class PrepaidEnergySensor(RestoreEntity, SensorEntity):
         try:
             self._balance = float(last_state.state)
         except (ValueError, TypeError):
-            _LOGGER.warning("Could not restore balance from state '%s', keeping initial value.", last_state.state)
+            _LOGGER.warning("Could not restore balance from state '%s'.", last_state.state)
 
         attrs = last_state.attributes
 
@@ -140,17 +125,13 @@ class PrepaidEnergySensor(RestoreEntity, SensorEntity):
         self._last_topup_date = attrs.get("last_topup_date")
         self._last_alert_level = attrs.get("alert_level", ALERT_NONE)
 
-        log = attrs.get("daily_consumption_log", [])
-        if isinstance(log, list):
-            self._daily_log = deque(log, maxlen=ROLLING_AVERAGE_DAYS)
-
         if self._last_meter_value is None:
             self._seed_meter_baseline()
 
         _LOGGER.debug("State restored. Balance: %.2f kWh, last meter: %s", self._balance, self._last_meter_value)
 
     def _seed_meter_baseline(self):
-        """Read current meter value as baseline if we have nothing restored."""
+        """Read current meter value as baseline on first run."""
         meter_state = self._hass.states.get(self._meter_sensor)
         if meter_state and meter_state.state not in ("unknown", "unavailable", None, ""):
             try:
@@ -163,57 +144,50 @@ class PrepaidEnergySensor(RestoreEntity, SensorEntity):
 
     async def _daily_update(self, now):
         """
-        Called at 23:59:55 each night.
-        Reads today's meter value, calculates usage, decrements balance.
+        Called at 23:59:55 each night (or manually via force_update).
+        Reads today's meter value, calculates usage since last reading,
+        and deducts from balance.
         """
         meter_state = self._hass.states.get(self._meter_sensor)
         if not meter_state or meter_state.state in ("unknown", "unavailable", None, ""):
-            _LOGGER.warning("Meter sensor '%s' unavailable at daily update time. Skipping.", self._meter_sensor)
+            _LOGGER.warning("Meter sensor '%s' unavailable. Skipping update.", self._meter_sensor)
             return
 
         try:
             current_meter = float(meter_state.state)
         except (ValueError, TypeError):
-            _LOGGER.warning("Meter sensor returned non-numeric value: %s. Skipping daily update.", meter_state.state)
+            _LOGGER.warning("Meter sensor returned non-numeric value: %s. Skipping.", meter_state.state)
             return
 
         if self._last_meter_value is None:
-            # First run -- just seed the baseline, don't deduct anything
+            # First ever run -- seed baseline, no deduction
             self._last_meter_value = current_meter
-            self._last_update = datetime.now()
+            self._last_updated = datetime.now()
             self.async_write_ha_state()
-            _LOGGER.info("First daily run -- seeded meter baseline at %.2f kWh.", current_meter)
+            _LOGGER.info("First run -- seeded meter baseline at %.2f kWh.", current_meter)
             return
 
-        # If current reading is less than last, the sensor has reset (daily counter).
-        # Treat the current reading as today's usage directly.
+        # Calculate usage. If meter has reset to a new day (daily counter),
+        # use current reading directly as today's usage.
         if current_meter < self._last_meter_value:
-            _LOGGER.info(
-                "Meter reset detected (%.2f -> %.2f). Treating current reading as today's usage.",
-                self._last_meter_value, current_meter
-            )
             used = round(current_meter, 2)
+            _LOGGER.info("Daily counter reset detected. Today's usage: %.2f kWh.", used)
         else:
             used = round(current_meter - self._last_meter_value, 2)
 
         self._balance = round(max(0.0, self._balance - used), 2)
         self._last_meter_value = current_meter
-        self._last_update = datetime.now()
+        self._last_updated = datetime.now()
 
-        # Log daily consumption
-        today = date.today().isoformat()
-        self._daily_log.append({"date": today, "used_kwh": used})
-        _LOGGER.info("Daily update: used %.2f kWh. Remaining balance: %.2f kWh.", used, self._balance)
+        _LOGGER.info("Update complete. Used: %.2f kWh. Balance: %.2f kWh.", used, self._balance)
 
         self.async_write_ha_state()
-
-        # Check and fire alerts
         await self._check_alerts()
 
-    # --- Top-up and reset ---
+    # --- Services ---
 
     async def async_top_up(self, units: float):
-        """Add units to balance. Called by service handler in __init__."""
+        """Add units to balance."""
         if units <= 0:
             _LOGGER.warning("Top-up called with non-positive value: %.2f. Ignoring.", units)
             return
@@ -221,48 +195,37 @@ class PrepaidEnergySensor(RestoreEntity, SensorEntity):
         self._balance = round(self._balance + units, 2)
         self._last_topup_amount = units
         self._last_topup_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        self._last_update = datetime.now()
-
-        # Reset alert level so notifications fire again if balance drops again
+        self._last_updated = datetime.now()
         self._last_alert_level = ALERT_NONE
-
         self.async_write_ha_state()
         _LOGGER.info("Topped up %.2f kWh. New balance: %.2f kWh.", units, self._balance)
 
     async def async_reset(self, balance: float):
-        """Set balance to a specific value. Called by service handler in __init__."""
+        """Set balance to a specific value."""
         self._balance = round(max(0.0, balance), 2)
-        self._last_update = datetime.now()
+        self._last_updated = datetime.now()
         self._last_alert_level = ALERT_NONE
         self.async_write_ha_state()
         _LOGGER.info("Balance reset to %.2f kWh.", self._balance)
 
     async def async_force_update(self):
-        """
-        Manually trigger a daily update calculation immediately.
-        Useful on first deployment to account for today's usage,
-        or any time you want an out-of-schedule reconciliation.
-        """
+        """Manually trigger a daily update calculation immediately."""
         _LOGGER.info("Force update triggered manually.")
         await self._daily_update(None)
 
     # --- Alerts ---
 
     async def _check_alerts(self):
-        """
-        Fire a notification if balance has crossed a threshold downward.
-        Each level fires only once -- resets on top-up.
-        """
+        """Fire a notification if balance has crossed a threshold downward."""
         balance = self._balance
         current_level = self._current_alert_level(balance)
 
-        # Only notify if we've crossed into a new (worse) level
         level_order = [ALERT_NONE, ALERT_WARNING, ALERT_LOW, ALERT_CRITICAL]
         current_rank = level_order.index(current_level)
         last_rank = level_order.index(self._last_alert_level)
 
         if current_rank <= last_rank:
-            return  # No change or already notified at this level
+            return
 
         self._last_alert_level = current_level
 
@@ -303,10 +266,3 @@ class PrepaidEnergySensor(RestoreEntity, SensorEntity):
         if balance <= self._threshold_warning:
             return ALERT_WARNING
         return ALERT_NONE
-
-    def _rolling_average(self):
-        """Calculate average daily consumption over logged days."""
-        if not self._daily_log:
-            return None
-        total = sum(entry["used_kwh"] for entry in self._daily_log)
-        return total / len(self._daily_log)
